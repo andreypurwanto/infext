@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import csv
 import pytesseract
 from pytesseract import Output
@@ -719,8 +719,10 @@ def get_lines(img_ori, img_gray):
 
     return(table, non_table)
 
-def create_table(tables, img_gray, size_):
+def create_table(tables, img_gray):
     # img_ori = img_ori
+    # height, width = img_gray.shape
+    # print(height, width)
     img = img_gray
     # img2 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img3 = cv2.medianBlur(img, 5)
@@ -736,6 +738,7 @@ def create_table(tables, img_gray, size_):
     for x_image in range(len(tables_img)):
         try:
             img = tables_img[x_image]
+            # img.save('test.jpg', "JPEG", quality=95, optimize=True, progressive=True)
             # print(type(img))
             # thresholding the image to a binary image
             thresh, img_bin = cv2.threshold(
@@ -746,7 +749,7 @@ def create_table(tables, img_gray, size_):
             img_bin = 255-img_bin
 
             # Plotting the image to see the output
-            plotting = plt.imshow(img_bin, cmap='gray')
+            # plotting = plt.imshow(img_bin, cmap='gray')
             # plt.show()
 
             # countcol(width) of kernel as 100th of total width
@@ -769,15 +772,15 @@ def create_table(tables, img_gray, size_):
             # print(vertical_lines)
             # cv2.imwrite("vertical.jpg",vertical_lines)
             # Plot the generated image
-            plotting = plt.imshow(image_1, cmap='gray')
+            # plotting = plt.imshow(image_1, cmap='gray')
             # plt.show()
 
             # Use horizontal kernel to detect and save the horizontal lines in a jpg
-            image_2 = cv2.erode(img_bin, hor_kernel, iterations=3)
-            horizontal_lines = cv2.dilate(image_2, hor_kernel, iterations=3)
+            image_2 = cv2.erode(img_bin, hor_kernel, iterations=5)
+            horizontal_lines = cv2.dilate(image_2, hor_kernel, iterations=5)
             # cv2.imwrite("horizontal.jpg",horizontal_lines)
             # Plot the generated image
-            plotting = plt.imshow(image_2, cmap='gray')
+            # plotting = plt.imshow(image_2, cmap='gray')
             # plt.show()
 
             # Combine horizontal and vertical lines in a new third image, with both having same weight.
@@ -812,11 +815,11 @@ def create_table(tables, img_gray, size_):
             # Get position (x,y), width and height for every contour and show the contour on image
             for c in contours:
                 x, y, w, h = cv2.boundingRect(c)
-                if ((w < size_/2 and h < size_/3)):
-                    image = cv2.rectangle(
-                        img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                    box.append([x, y, w, h])
-
+                if (w < tables[x_image][2]/1.1 or h < tables[x_image][3]/1.1):
+                  image = cv2.rectangle(
+                      img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                  box.append([x, y, w, h])
+            # print('box = ',box)
             # plotting = plt.imshow(image,cmap='gray')
             # plt.show()
 
@@ -869,11 +872,22 @@ def create_table(tables, img_gray, size_):
                 lis = []
                 for k in range(countcol):
                     lis.append([])
+                last_indexing = countcol
                 for j in range(len(row[i])):
-                    diff = abs(center-(row[i][j][0]+row[i][j][2]/4))
-                    minimum = min(diff)
-                    indexing = list(diff).index(minimum)
-                    lis[indexing].append(row[i][j])
+                    # print(len(row[i]))
+                    # print(countcol)
+                    if len(row[i])==countcol:
+                        diff = abs(center-(row[i][j][0]+row[i][j][2]/4))
+                        minimum = min(diff)
+                        indexing = list(diff).index(minimum)
+                        lis[indexing].append(row[i][j])
+                    else:
+                        diff = abs(center-(row[i][j][0]))
+                        minimum = min(diff)
+                        indexing = list(diff).index(minimum)
+                        for l in range(indexing,last_indexing,1):
+                            lis[l].append(row[i][j])
+                        last_indexing = indexing
                 finalboxes.append(lis)
 
             # from every single image-based cell/box the strings are extracted via pytesseract and stored in a list
@@ -892,12 +906,14 @@ def create_table(tables, img_gray, size_):
                             y, x, w, h = finalboxes[i][j][k][0], finalboxes[i][j][
                                 k][1], finalboxes[i][j][k][2], finalboxes[i][j][k][3]
                             finalimg = bitnot[x:x+h, y:y+w]
-                    #   kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
-                    #   border = cv2.copyMakeBorder(finalimg,2,2,2,2, cv2.BORDER_CONSTANT,value=[255,255])
-                    #   resizing = cv2.resize(border, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-                    #   dilation = cv2.dilate(resizing, kernel,iterations=2)
-                    #   erosion = cv2.erode(dilation, kernel,iterations=2)
+                            #   kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+                            #   border = cv2.copyMakeBorder(finalimg,2,2,2,2, cv2.BORDER_CONSTANT,value=[255,255])
+                            #   resizing = cv2.resize(border, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                            #   dilation = cv2.dilate(resizing, kernel,iterations=2)
+                            #   erosion = cv2.erode(dilation, kernel,iterations=2)
                             # out = pytesseract.image_to_string(erosion)
+                            # cv2_imshow(finalimg)
+                            # print('-----------------------------------------------------------------------------')
                             blur = cv2.GaussianBlur(finalimg, (7, 7), 0)
                             thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
                             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
@@ -917,6 +933,7 @@ def create_table(tables, img_gray, size_):
                                   wmax = w
                             if int(wmax*1.1)<hmax:
                                 finalimg = cv2.rotate(finalimg, cv2.cv2.ROTATE_90_CLOCKWISE)
+                            # cv2_imshow(finalimg)
                             out = pytesseract.image_to_string(
                                 finalimg, config='-l eng+gcr --psm 6')
                             if(len(out) < 2):
@@ -924,16 +941,19 @@ def create_table(tables, img_gray, size_):
                                     finalimg, config='-l eng+gcr --psm 6 --oem 3 -c tessedit_char_whitelist=0123456789')
                             out = out[:-1]
                             inner = inner + " " + out
-                            # cv2_imshow(finalimg)
                         check = check+1
                         outer.append(inner.replace("\n", " "))
+                        # print(outer)
                         # print(inner.replace("\n"," "))
             count_row.append(count_row_)
             arr = np.array(outer)
+            # print('finalboxes',finalboxes)
+            # print('arr = ',arr)
+            # print('countcol = ',countcol)
             dataframe.append(pd.DataFrame(arr.reshape(len(row), countcol)))
         except IndexError:
             pass
-
+    # bitnot.save('test.jpg', "JPEG", quality=95, optimize=True, progressive=True)
     return(dataframe)
 
 def save_img_table(tables, img_ori, name, page, dir_file, dir_next):
@@ -1319,7 +1339,7 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
         for item in range(len(final_box)):
             if final_box[item][1] == 'table':
                 os.chdir(result_directory+'/'+'page '+str(i) + '/'+'tables')
-                (create_table([final_box[item][0]],img_gray,size_))[0].to_csv(str(final_box[item][2])+'.csv')
+                (create_table([final_box[item][0]],img_gray))[0].to_csv(str(final_box[item][2])+'.csv')
                 print([final_box[item][0]])
                 os.chdir(result_directory+'/'+'page '+str(i))
                 save_img_table2([final_box[item][0]], img_ori, str(final_box[item][2]), i, result_directory + '/'+'page '+str(i), result_directory+'/'+'page '+str(i)+'/'+'tables')

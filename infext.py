@@ -108,7 +108,7 @@ def return_text_non_table(img_ori, img_gray, height_, width_, table_, nontable_)
                     # previous_count = count
                     first_row = False
                 else:
-                    if(previous_x-50 < row.top < previous_x+50):
+                    if(previous_x-(height_//70) < row.top < previous_x+(height_//70)):
                         extracted_text[count].append(row.text)
                         previous_x = row.top
                         debug_dataframe = debug_dataframe.append(row, ignore_index=True)
@@ -1263,7 +1263,7 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
     for i in range(len(images1)):
         # if i == 10:
         #     break
-        i = 8
+        i = 6
         start_time = timeit.default_timer()
         # convert page of i file into image
         images = convert_from_bytes(open(file_pdf, "rb").read(), size=size_, poppler_path=poppler_path, first_page=i+1, last_page=i+1)

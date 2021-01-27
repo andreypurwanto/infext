@@ -303,63 +303,68 @@ def return_text_non_table2(img_ori, img_gray, height_, width_, table_, nontable_
                         extracted_text[count].append(row.text)
                         previous_x = row.top
                         debug_dataframe = debug_dataframe.append(row, ignore_index=True)
-    df_combined_sentences_bb = debug_dataframe.groupby(by = ["block_num","par_num",'line_num']).apply(combine_lines_and_bb)
-    df_combined_sentences_bb = df_combined_sentences_bb.reset_index()
-    df_combined_sentences_bb['lines'] = (df_combined_sentences_bb.index) + 1
-    df_combined_sentences_bb = df_combined_sentences_bb[['lines','left','top','width','height','lines_combine']]
-    df_combined_sentences_bb = (df_combined_sentences_bb.sort_values(by=['top'])).reset_index(drop=True)
-    df_combined_sentences_bb['lines_par'] = 0
-    lines_par_count = 1
-    bbox_text = []
-    blur = cv2.GaussianBlur(img2, (7, 7), 0)
-    thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-    # Create rectangular structuring element and dilate
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    dilate = cv2.dilate(thresh, kernel, iterations=15)
-    cnts = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-    count_ = []      
-    for c in cnts:
-        check = True
-        x, y, w, h = cv2.boundingRect(c) 
-        count_.append([x, y, w, h])
-    df_bbox = pd.DataFrame(count_, columns=['y','x','w','h'])
-    df_bbox = (df_bbox.sort_values(by=['x'])).reset_index(drop=True)
-    for index1,row1 in df_bbox.iterrows() :  
-        y, x, w, h = [row1.y,row1.x,row1.w,row1.h] 
-        for index, row in df_combined_sentences_bb.iterrows():
-            if row.lines_par == 0 and get_iou([y, x, w, h],[row['left'], row['top'], row['width'], row['height']]) > 0:
-#               if get_iou([y, x, w, h],[row['left'], row['top'], row['width'], row['height']]) > 0:
-                df_combined_sentences_bb.loc[index,'lines_par'] = lines_par_count
-        lines_par_count+=1
-    list_df_text_grouped = []
-    for key, df_lines_par in df_combined_sentences_bb.groupby('lines_par'):
-        df_lines_par = df_lines_par.reset_index(drop=True)
-        df_lines_par['lowercase_tag'] = 0
-        count_lowercase_tag = 0
-        for index, row in (df_lines_par).iterrows():
-            if (index > 0):
-                if row.lines_combine[0].islower():
-                    df_lines_par.loc[index,'lowercase_tag'] = count_lowercase_tag
-                else:
-                    count_lowercase_tag += 1
-                    df_lines_par.loc[index,'lowercase_tag'] = count_lowercase_tag
-        df_lines_par = df_lines_par.groupby('lowercase_tag').apply(f2)
-        df_lines_par = df_lines_par.reset_index()
-        if (len(df_lines_par) == 1):
-            df_lines_par['detected_as'] = 'text'
+    if len(debug_dataframe) > 0:
+        df_combined_sentences_bb = debug_dataframe.groupby(by = ["block_num","par_num",'line_num']).apply(combine_lines_and_bb)
+        df_combined_sentences_bb = df_combined_sentences_bb.reset_index()
+        df_combined_sentences_bb['lines'] = (df_combined_sentences_bb.index) + 1
+        df_combined_sentences_bb = df_combined_sentences_bb[['lines','left','top','width','height','lines_combine']]
+        df_combined_sentences_bb = (df_combined_sentences_bb.sort_values(by=['top'])).reset_index(drop=True)
+        df_combined_sentences_bb['lines_par'] = 0
+        lines_par_count = 1
+        bbox_text = []
+        blur = cv2.GaussianBlur(img2, (7, 7), 0)
+        thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+        # Create rectangular structuring element and dilate
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        dilate = cv2.dilate(thresh, kernel, iterations=10)
+        cnts = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+        count_ = []      
+        for c in cnts:
+            check = True
+            x, y, w, h = cv2.boundingRect(c) 
+            count_.append([x, y, w, h])
+        df_bbox = pd.DataFrame(count_, columns=['y','x','w','h'])
+        df_bbox = (df_bbox.sort_values(by=['x'])).reset_index(drop=True)
+        for index1,row1 in df_bbox.iterrows() :  
+            y, x, w, h = [row1.y,row1.x,row1.w,row1.h] 
+            for index, row in df_combined_sentences_bb.iterrows():
+                if row.lines_par == 0 and get_iou([y, x, w, h],[row['left'], row['top'], row['width'], row['height']]) > 0:
+    #               if get_iou([y, x, w, h],[row['left'], row['top'], row['width'], row['height']]) > 0:
+                    df_combined_sentences_bb.loc[index,'lines_par'] = lines_par_count
+            lines_par_count+=1
+        list_df_text_grouped = []
+        for key, df_lines_par in df_combined_sentences_bb.groupby('lines_par'):
+            df_lines_par = df_lines_par.reset_index(drop=True)
+            df_lines_par['lowercase_tag'] = 0
+            count_lowercase_tag = 0
+            for index, row in (df_lines_par).iterrows():
+                if (index > 0):
+                    if row.lines_combine[0].islower():
+                        df_lines_par.loc[index,'lowercase_tag'] = count_lowercase_tag
+                    else:
+                        count_lowercase_tag += 1
+                        df_lines_par.loc[index,'lowercase_tag'] = count_lowercase_tag
+            df_lines_par = df_lines_par.groupby('lowercase_tag').apply(f2)
+            df_lines_par = df_lines_par.reset_index()
+            if (len(df_lines_par) == 1):
+                df_lines_par['detected_as'] = 'text'
+            else:
+                df_lines_par['detected_as'] = 'text'
+                df_lines_par.loc[0, 'detected_as'] = 'title'
+            df_lines_par = df_lines_par.drop(columns='lowercase_tag')
+            list_df_text_grouped.append(df_lines_par)
+    #     list_df_text_grouped.reverse()
+        for i in range(len(list_df_text_grouped)):
+            list_df_text_grouped[i]['group'] = i+1
+        if len(list_df_text_grouped)>0:
+            df_combined_final = pd.concat(list_df_text_grouped)
         else:
-            df_lines_par['detected_as'] = 'text'
-            df_lines_par.loc[0, 'detected_as'] = 'title'
-        df_lines_par = df_lines_par.drop(columns='lowercase_tag')
-        list_df_text_grouped.append(df_lines_par)
-#     list_df_text_grouped.reverse()
-    for i in range(len(list_df_text_grouped)):
-        list_df_text_grouped[i]['group'] = i+1
-    if len(list_df_text_grouped)>0:
-        df_combined_final = pd.concat(list_df_text_grouped)
+            df_combined_final = pd.DataFrame(columns = ['left','top','width','height','lines_combine','detected_as','group'])
     else:
-        df_combined_final = pd.DataFrame(columns = ['left','top','width','height','lines_combine','detected_as','group'])
+        df_combined_sentences_bb = []
+        list_df_text_grouped = []
+        df_combined_final = []
     return(df_combined_sentences_bb, list_df_text_grouped, df_combined_final)
 
 
@@ -855,6 +860,7 @@ def create_table(tables, img_gray, height_, width_):
     # d['area'] = d['width']*d['height']
     dataframe = []
     tables_img = []
+    image_inside_table = {}
     # tables_img_ori = []
     for i in range(len(tables)):
         # print(i)
@@ -940,10 +946,11 @@ def create_table(tables, img_gray, height_, width_):
             # Get position (x,y), width and height for every contour and show the contour on image
             for c in contours:
                 x, y, w, h = cv2.boundingRect(c)
-                if (w < tables[x_image][2]/1.1 or h < tables[x_image][3]/1.1):
-                  image = cv2.rectangle(
-                      img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                  box.append([x, y, w, h])
+                if (w < tables[x_image][2]//1.1 or h < tables[x_image][3]//1.1) and w > width_//500 and h > height_//500 :
+                    image = cv2.rectangle(
+                        img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                    # print(x,y,w,h)
+                    box.append([x, y, w, h])
             # print('box = ',box)
             # plotting = plt.imshow(image,cmap='gray')
 #             plt.show()
@@ -973,13 +980,13 @@ def create_table(tables, img_gray, height_, width_):
                         column = []
                         previous = box[i]
                         column.append(box[i])
-
             # calculating maximum number of cells
             countcol = 0
             for i in range(len(row)):
-                countcol = len(row[i])
-                if countcol > countcol:
-                    countcol = countcol
+                # countcol = len(row[i])
+                if countcol < len(row[i]):
+                    countcol = len(row[i])
+                    # countcol = countcol
             # print('row = ',row)
             # print('column = ',column)
             # print('countcol = ',countcol)
@@ -1014,7 +1021,7 @@ def create_table(tables, img_gray, height_, width_):
                             lis[l].append(row[i][j])
                         last_indexing = indexing
                 finalboxes.append(lis)
-
+            # print("finalboxes = ",finalboxes)
             # from every single image-based cell/box the strings are extracted via pytesseract and stored in a list
             outer = []
             count_row = []
@@ -1064,7 +1071,7 @@ def create_table(tables, img_gray, height_, width_):
                             d2 = pytesseract.image_to_data(finalimg, output_type=Output.DATAFRAME, config='-l eng+gcr --psm 6')
 #                             d2 = d2.replace(np.nan, '', regex=True)
                             d2 = d2.dropna()
-                            df_contain_image = d2[(d2['width']*d2['height']>(height_*width_)//440) & (d2['conf']!= -1)]
+                            df_contain_image = d2[(d2['width']*d2['height']>(height_*width_)//420) & (d2['conf']!= -1)]
 #                             print(df_contain_image)
                             if len(df_contain_image) > 0:
 #                                 df_test.append(df_contain_image)
@@ -1072,14 +1079,12 @@ def create_table(tables, img_gray, height_, width_):
 #                                 print(df_contain_image)
                                 for idx,row_df_contain_image in df_contain_image.iterrows():
                                     if row_df_contain_image.width > 0 and row_df_contain_image.height > 0:
-#                                         print(row_df_contain_image.top,row_df_contain_image.left,row_df_contain_image.width,row_df_contain_image.height)
-#                                         print("row = ",row_df_contain_image.top)
-#                                         cv2.imshow("tes", finalimg[row.left:row.left+row.height, row.top:row.top+row.width])
                                         image_inside_table["ist"+str(x_image)+"-"+str(k)+"-"+str(j)+"-"+str(i)+"-"+str(idx)] = [[tables[x_image][0]+int(row_df_contain_image.left+y),tables[x_image][1]+int(row_df_contain_image.top+x),int(row_df_contain_image.width),int(row_df_contain_image.height)],'non-table',"imagefromtable"+str(x_image)+"-"+str(k)+"-"+str(j)+"-"+str(i)+"-"+str(idx)] 
                                 d2 = d2.drop(index=df_contain_image.index)
+                            # print(d2)
+                            d2["text"]= d2["text"].values.astype(str)
                             d2 = d2.groupby(by = ["par_num",'line_num']).apply(f)
                             d2 = d2.reset_index()
-#                             print(d2)
                             out = ''
                             for index_df,row_df in d2.iterrows():
                                 if index_df == 0:
@@ -1090,7 +1095,7 @@ def create_table(tables, img_gray, height_, width_):
 #                             out = pytesseract.image_to_string(
 #                                 finalimg, config='-l eng+gcr --psm 6')
                             
-                            if(len(out) < 2):
+                            if(len(out) < 3):
                                 out = pytesseract.image_to_string(
                                     finalimg, config='-l eng+gcr --psm 6 --oem 3 -c tessedit_char_whitelist=0123456789')
                                 if(len(out)==0):
@@ -1128,12 +1133,16 @@ def save_img_table2(tables, img_ori, name, page, dir_file, dir_next):
     # img_ori = cv2.imread(file)
     os.chdir(dir_next)
     # dataframe = []
+    print(tables)
     tables_img = []
     tables_img_ori = []
     for i in range(len(tables)):
         tables_img_ori.append(img_ori[tables[i][1]:tables[i][1]+tables[i][3], tables[i][0]:tables[i][0]+tables[i][2]])
-        im = Img.fromarray(tables_img_ori[i])
-        im.save(str(name)+".jpeg")
+        try:
+            im = Img.fromarray(tables_img_ori[i])
+            im.save(str(name)+".jpeg")
+        except ValueError:
+            pass
     os.chdir(dir_file)
 
 def get_iou(bb1, bb2):
@@ -1149,7 +1158,10 @@ def get_iou(bb1, bb2):
     bb1_area = bb1[2] * bb1[3]
     bb2_area = bb2[2] * bb2[3]
     # iou = intersection_area / float(bb1_area + bb2_area - intersection_area)
-    iou = intersection_area / float(bb2_area)
+    if(bb2_area == 0):
+        iou = -1
+    else:
+        iou = intersection_area / float(bb2_area)
     return iou
 
 def combined_tables_and_nontable(table, nontable, cek_table, height_, width_):
@@ -1416,10 +1428,10 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
     # find out how many pages needed in 1 pdf
     images1 = convert_from_bytes(open(file_pdf, "rb").read(), size=10, poppler_path=poppler_path)
 
-    for i in range(len(images1)):
+    for i in range(75,len(images1)):
         # if i == 10:
         #     break
-        i = 4
+        # i = 75
         start_time = timeit.default_timer()
         # convert page of i file into image
         images = convert_from_bytes(open(file_pdf, "rb").read(), size=size_, poppler_path=poppler_path, first_page=i+1, last_page=i+1)
@@ -1438,11 +1450,12 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
         img_ori_copy2 = cv2.cvtColor(img_ori_copy, cv2.COLOR_BGR2RGB)
         img_gray = cv2.imread(file,0)
         height_, width_ = img_gray.shape
+        # print(height_,width_)
 
         # return boundingbox of table and non-table image using hough transform
         table, nontable = get_lines(img_ori, img_gray)
-        print("table = ",table)
-        print("nontable = ",nontable)
+        # print("table = ",table)
+        # print("nontable = ",nontable)
         detected_table_line = table.copy()
         detected_nontable_line = nontable.copy()
 
@@ -1492,7 +1505,7 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
         
         # # get detected title from final_tables
         df_images_title,final_box = get_title_from_images(dict1, df_combined_final, img_ori, height_, width_)
-        print("final_box = ",final_box)
+        # print("final_box = ",final_box)
         # final_box.update(image_inside_table)
         os.mkdir('tables')
         os.mkdir('images')
@@ -1501,7 +1514,8 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
             if final_box[item][1] == 'table':
                 os.chdir(result_directory+'/'+'page '+str(i) + '/'+'tables')
                 dataframe_, image_inside_table = create_table([final_box[item][0]],img_gray,height_, width_)
-                dataframe_[0].to_csv(str(final_box[item][2])+'.csv')
+                if (len(dataframe_)>0):
+                    dataframe_[0].to_csv(str(final_box[item][2])+'.csv')
                 # print([final_box[item][0]])
                 os.chdir(result_directory+'/'+'page '+str(i))
                 for item2 in image_inside_table:
@@ -1513,7 +1527,8 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
         # create folder for dataframe of text within page and store csv(s)
         os.mkdir('text')
         os.chdir(result_directory+'/'+'page '+str(i)+'/'+'text')
-        df_combined_final.to_csv('text.csv')
+        if len(df_combined_final) > 0: 
+            df_combined_final.to_csv('text.csv')
         os.chdir(result_directory+'/'+'page '+str(i))
 
         elapsed = timeit.default_timer() - start_time
@@ -1523,4 +1538,4 @@ def information_extraction(file_pdf, input_directory, result_folder_name, size_,
 
         #remove png file
         # os.remove(file)
-        break
+        # break
